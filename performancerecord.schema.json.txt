@@ -1,0 +1,56 @@
+{
+  "name": "PerformanceRecord",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "topic": {
+      "type": "string"
+    },
+    "assessment_type": {
+      "type": "string",
+      "enum": [
+        "Quiz",
+        "Practice Test",
+        "Mock Exam",
+        "Self Assessment",
+        "Chapter Test"
+      ]
+    },
+    "score": {
+      "type": "number",
+      "description": "Score obtained"
+    },
+    "max_score": {
+      "type": "number",
+      "description": "Maximum possible score"
+    },
+    "percentage": {
+      "type": "number"
+    },
+    "time_taken_minutes": {
+      "type": "number"
+    },
+    "weak_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Identified weak concepts"
+    },
+    "strong_areas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Strong concepts"
+    },
+    "improvement_tips": {
+      "type": "array",
+      "items": {
+        "type": "string"
+ 

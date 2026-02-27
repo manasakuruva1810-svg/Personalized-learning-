@@ -1,0 +1,56 @@
+{
+  "name": "MentorChat",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string"
+    },
+    "conversation_id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Doubt",
+        "Motivation",
+        "Career",
+        "Study Tips",
+        "Emotional Support",
+        "Planning"
+      ]
+    },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "student",
+              "mentor"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "resolved": {
+      "type": "boolean",
+      "default": false
+    },
+    "helpful_rating": {
+      "type": "number",
+      "description": "1-5 rating"
+    }
+  },
+  "required": [
+    "category",
+    "messages"
+  ]
+}

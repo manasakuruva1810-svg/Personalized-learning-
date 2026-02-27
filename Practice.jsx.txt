@@ -1,0 +1,448 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { 
+  Target,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  Sparkles,
+  RotateCcw,
+  Trophy,
+  ArrowRight,
+  Clock,
+  Brain
+} from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+
+export default function Practice() {
+  const queryClient = useQueryClient();
+  const [selectedSubject, setSelectedSubject] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [quiz, setQuiz] = useState(null);
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [answers, setAnswers] = useState([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const { data: profiles } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => base44.entities.StudentProfile.list(),
+  });
+  const profile = profiles?.[0];
+
+  const subjects = profile?.subjects || ['Mathematics', 'Physics', 'Chemistry', 'English'];
+
+  const generateQuizMutation = useMutation({
+    mutationFn: async () => {
+      setIsGenerating(true);
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generate a practice quiz for a ${profile?.class_grade || 'Class 10'} student.
+Subject: ${selectedSubject}
+Topic: ${selectedTopic || 'General concepts'}
+Target Exam: ${profile?.exam_target || 'Board Exams'}
+
+Create 5 multiple choice questions that:
+- Are appropriate for the student's level
+- Have clear, unambiguous questions
+- Include 4 options each
+- Have detailed explanations for correct answers
+- Progress from easier to harder
+
+Make questions practical and exam-relevant.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            quiz_title: { type: "string" },
+            difficulty: { type: "string" },
+            questions: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  question: { type: "string" },
+                  options: { type: "array", items: { type: "string" } },
+                  correct_index: { type: "number" },
+                  explanation: { type: "string" },
+                  concept: { type: "string" }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      setQuiz(response);
+      setCurrentQuestion(0);
+      setAnswers([]);
+      setSelectedAnswer(null);
+      setShowResult(false);
+      setIsGenerating(false);
+    },
+    onError: () => {
+      setIsGenerating(false);
+    }
+  });
+
+  const handleAnswer = (index) => {
+    if (selectedAnswer !== null) return;
+    setSelectedAnswer(index);
+    setAnswers([...answers, {
+      questionIndex: currentQuestion,
+      selected: index,
+      correct: index === quiz.questions[currentQuestion].correct_index
+    }]);
+  };
+
+  const nextQuestion = () => {
+    if (currentQuestion < quiz.questions.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+    } else {
+      setShowResult(true);
+      savePerformance();
+    }
+  };
+
+  const savePerformance = async () => {
+    const correctCount = answers.filter(a => a.correct).length;
+    const percentage = (correctCount / quiz.questions.length) * 100;
+    
+    const weakConcepts = quiz.questions
+      .filter((q, i) => answers[i] && !answers[i].correct)
+      .map(q => q.concept);
+
+    const strongConcepts = quiz.questions
+      .filter((q, i) => answers[i] && answers[i].correct)
+      .map(q => q.concept);
+
+    await base44.entities.PerformanceRecord.create({
+      subject: selectedSubject,
+      topic: selectedTopic || 'General',
+      assessment_type: 'Quiz',
+      score: correctCount,
+      max_score: quiz.questions.length,
+      percentage,
+      weak_areas: weakConcepts,
+      strong_areas: strongConcepts,
+      assessment_date: new Date().toISOString().split('T')[0]
+    });
+
+    // Award XP
+    const xpEarned = Math.round(percentage / 10) * 10;
+    if (profile) {
+      await base44.entities.StudentProfile.update(profile.id, {
+        total_xp: (profile.total_xp || 0) + xpEarned
+      });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ['performances'] });
+    queryClient.invalidateQueries({ queryKey: ['studentProfile'] });
+  };
+
+  const resetQuiz = () => {
+    setQuiz(null);
+    setCurrentQuestion(0);
+    setAnswers([]);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setSelectedSubject(null);
+    setSelectedTopic(null);
+  };
+
+  // Subject Selection
+  if (!selectedSubject) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Target className="w-7 h-7 text-violet-600" />
+              Practice Zone
+            </h1>
+            <p className="text-slate-600 mt-1">Test your knowledge and improve weak areas</p>
+          </div>
+
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle>Select a Subject</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {subjects.map((subject) => (
+                  <motion.button
+                    key={subject}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => setSelectedSubject(subject)}
+                    className="p-6 rounded-2xl border-2 border-slate-200 bg-white hover:border-violet-400 hover:shadow-lg transition-all text-left"
+                  >
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-2xl mb-3">
+                      {subject === 'Mathematics' ? '📐' :
+                       subject === 'Physics' ? '⚛️' :
+                       subject === 'Chemistry' ? '🧪' :
+                       subject === 'Biology' ? '🧬' :
+                       subject === 'English' ? '📚' :
+                       subject === 'Hindi' ? '📖' : '📝'}
+                    </div>
+                    <h3 className="font-semibold text-slate-800">{subject}</h3>
+                  </motion.button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Topic Input
+  if (!quiz) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <Card className="border-0 shadow-lg">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-violet-600" />
+                  {selectedSubject} Quiz
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setSelectedSubject(null)}>
+                  Change Subject
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Specific Topic (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={selectedTopic || ''}
+                  onChange={(e) => setSelectedTopic(e.target.value)}
+                  placeholder="e.g., Quadratic Equations, Newton's Laws..."
+                  className="w-full p-3 rounded-xl border border-slate-200 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 outline-none"
+                />
+              </div>
+              <Button
+                onClick={() => generateQuizMutation.mutate()}
+                disabled={isGenerating}
+                className="w-full bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 py-6 text-lg"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Generating Quiz...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    Start Quiz
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Results Screen
+  if (showResult) {
+    const correctCount = answers.filter(a => a.correct).length;
+    const percentage = (correctCount / quiz.questions.length) * 100;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+        <div className="max-w-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            <Card className="border-0 shadow-xl overflow-hidden">
+              <div className={`p-8 text-white ${
+                percentage >= 80 ? 'bg-gradient-to-br from-green-500 to-emerald-600' :
+                percentage >= 60 ? 'bg-gradient-to-br from-amber-500 to-orange-600' :
+                'bg-gradient-to-br from-rose-500 to-red-600'
+              }`}>
+                <Trophy className="w-16 h-16 mx-auto mb-4" />
+                <h2 className="text-3xl font-bold mb-2">
+                  {percentage >= 80 ? 'Excellent!' :
+                   percentage >= 60 ? 'Good Job!' :
+                   'Keep Practicing!'}
+                </h2>
+                <p className="text-lg opacity-90">
+                  You scored {correctCount} out of {quiz.questions.length}
+                </p>
+                <p className="text-5xl font-bold mt-4">{percentage.toFixed(0)}%</p>
+              </div>
+
+              <CardContent className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-green-50 text-center">
+                    <CheckCircle2 className="w-6 h-6 text-green-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-green-700">{correctCount}</p>
+                    <p className="text-sm text-green-600">Correct</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-red-50 text-center">
+                    <XCircle className="w-6 h-6 text-red-500 mx-auto mb-2" />
+                    <p className="text-2xl font-bold text-red-700">{quiz.questions.length - correctCount}</p>
+                    <p className="text-sm text-red-600">Incorrect</p>
+                  </div>
+                </div>
+
+                {/* Review Answers */}
+                <div className="space-y-3 text-left">
+                  <h3 className="font-semibold text-slate-800">Review</h3>
+                  {quiz.questions.map((q, i) => (
+                    <div key={i} className={`p-3 rounded-xl ${
+                      answers[i]?.correct ? 'bg-green-50' : 'bg-red-50'
+                    }`}>
+                      <p className="text-sm font-medium text-slate-700">{i + 1}. {q.question}</p>
+                      <p className="text-xs text-slate-600 mt-1">
+                        {answers[i]?.correct ? '✓ Correct' : `✗ Correct answer: ${q.options[q.correct_index]}`}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <Button
+                  onClick={resetQuiz}
+                  className="w-full bg-violet-600 hover:bg-violet-700"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Try Another Quiz
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  // Quiz Screen
+  const question = quiz.questions[currentQuestion];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Progress */}
+        <Card className="border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-slate-600">
+                Question {currentQuestion + 1} of {quiz.questions.length}
+              </span>
+              <span className="text-sm text-slate-500">
+                {quiz.quiz_title}
+              </span>
+            </div>
+            <Progress value={(currentQuestion / quiz.questions.length) * 100} className="h-2" />
+          </CardContent>
+        </Card>
+
+        {/* Question */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentQuestion}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+          >
+            <Card className="border-0 shadow-lg">
+              <CardContent className="p-6">
+                <h2 className="text-lg font-semibold text-slate-800 mb-6">
+                  {question.question}
+                </h2>
+
+                <div className="space-y-3">
+                  {question.options.map((option, index) => {
+                    const isCorrect = index === question.correct_index;
+                    const isSelected = selectedAnswer === index;
+                    let bgColor = 'bg-white border-slate-200 hover:border-violet-300';
+                    
+                    if (selectedAnswer !== null) {
+                      if (isCorrect) bgColor = 'bg-green-50 border-green-400';
+                      else if (isSelected) bgColor = 'bg-red-50 border-red-400';
+                    }
+
+                    return (
+                      <motion.button
+                        key={index}
+                        whileHover={selectedAnswer === null ? { scale: 1.01 } : {}}
+                        whileTap={selectedAnswer === null ? { scale: 0.99 } : {}}
+                        onClick={() => handleAnswer(index)}
+                        disabled={selectedAnswer !== null}
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${bgColor}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-medium ${
+                            selectedAnswer !== null && isCorrect
+                              ? 'bg-green-500 text-white'
+                              : selectedAnswer !== null && isSelected
+                                ? 'bg-red-500 text-white'
+                                : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {String.fromCharCode(65 + index)}
+                          </span>
+                          <span className="text-slate-700">{option}</span>
+                          {selectedAnswer !== null && isCorrect && (
+                            <CheckCircle2 className="w-5 h-5 text-green-500 ml-auto" />
+                          )}
+                          {selectedAnswer !== null && isSelected && !isCorrect && (
+                            <XCircle className="w-5 h-5 text-red-500 ml-auto" />
+                          )}
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+
+                {/* Explanation */}
+                {selectedAnswer !== null && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 p-4 rounded-xl bg-violet-50 border border-violet-200"
+                  >
+                    <h4 className="font-semibold text-violet-800 mb-2">Explanation</h4>
+                    <p className="text-sm text-violet-700">{question.explanation}</p>
+                  </motion.div>
+                )}
+
+                {/* Next Button */}
+                {selectedAnswer !== null && (
+                  <Button
+                    onClick={nextQuestion}
+                    className="w-full mt-6 bg-violet-600 hover:bg-violet-700"
+                  >
+                    {currentQuestion < quiz.questions.length - 1 ? (
+                      <>
+                        Next Question
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    ) : (
+                      <>
+                        See Results
+                        <Trophy className="w-4 h-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+}

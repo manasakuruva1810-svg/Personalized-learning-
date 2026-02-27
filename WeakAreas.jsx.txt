@@ -1,0 +1,456 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import {
+  Brain,
+  AlertTriangle,
+  TrendingUp,
+  Sparkles,
+  Loader2,
+  Target,
+  BookOpen,
+  CheckCircle2,
+  ArrowRight,
+  Lightbulb
+} from 'lucide-react';
+
+export default function WeakAreas() {
+  const [improvementPlan, setImprovementPlan] = useState(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const { data: profiles } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => base44.entities.StudentProfile.list(),
+  });
+  const profile = profiles?.[0];
+
+  const { data: performances } = useQuery({
+    queryKey: ['performances'],
+    queryFn: () => base44.entities.PerformanceRecord.list('-assessment_date', 100),
+  });
+
+  // Analyze weak areas
+  const weakAreasMap = {};
+  const strongAreasMap = {};
+
+  performances?.forEach(perf => {
+    perf.weak_areas?.forEach(area => {
+      if (!weakAreasMap[area]) weakAreasMap[area] = { count: 0, subject: perf.subject };
+      weakAreasMap[area].count++;
+    });
+    perf.strong_areas?.forEach(area => {
+      if (!strongAreasMap[area]) strongAreasMap[area] = { count: 0, subject: perf.subject };
+      strongAreasMap[area].count++;
+    });
+  });
+
+  const weakAreas = Object.entries(weakAreasMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 10);
+
+  const strongAreas = Object.entries(strongAreasMap)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5);
+
+  // Subject performance
+  const subjectPerformance = {};
+  performances?.forEach(perf => {
+    if (!subjectPerformance[perf.subject]) {
+      subjectPerformance[perf.subject] = { total: 0, count: 0, scores: [] };
+    }
+    const pct = perf.percentage || (perf.score / perf.max_score * 100);
+    subjectPerformance[perf.subject].total += pct;
+    subjectPerformance[perf.subject].count++;
+    subjectPerformance[perf.subject].scores.push(pct);
+  });
+
+  const subjectAnalysis = Object.entries(subjectPerformance)
+    .map(([subject, data]) => ({
+      subject,
+      avg: data.total / data.count,
+      trend: data.scores.length > 1 ? 
+        data.scores[data.scores.length - 1] - data.scores[0] : 0
+    }))
+    .sort((a, b) => a.avg - b.avg);
+
+  const generateImprovementPlan = useMutation({
+    mutationFn: async (area) => {
+      setIsGenerating(true);
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Create a detailed improvement plan for a ${profile?.class_grade || 'Class 10'} student who is weak in: ${area}
+
+Student Profile:
+- Target Exam: ${profile?.exam_target || 'Board Exams'}
+- Learning Style: ${profile?.learning_style || 'Mixed'}
+- Daily Study Hours: ${profile?.daily_study_hours || 3}
+
+Provide:
+1. Root cause analysis - why students commonly struggle with this
+2. Step-by-step learning path (from basics to advanced)
+3. Specific practice exercises
+4. Memory techniques and tricks
+5. Common mistakes to avoid
+6. Daily practice routine (15-20 minutes focused)
+7. Free resources (YouTube channels, websites)
+8. Progress milestones to track
+
+Make it practical, encouraging, and achievable for a first-generation student with limited resources.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            topic: { type: "string" },
+            root_causes: { type: "array", items: { type: "string" } },
+            learning_path: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  step: { type: "number" },
+                  title: { type: "string" },
+                  description: { type: "string" },
+                  duration: { type: "string" }
+                }
+              }
+            },
+            practice_exercises: { type: "array", items: { type: "string" } },
+            memory_techniques: { type: "array", items: { type: "string" } },
+            common_mistakes: { type: "array", items: { type: "string" } },
+            daily_routine: { type: "string" },
+            free_resources: { type: "array", items: { type: "string" } },
+            milestones: { type: "array", items: { type: "string" } },
+            encouragement: { type: "string" }
+          }
+        }
+      });
+
+      setImprovementPlan(response);
+      setIsGenerating(false);
+      return response;
+    },
+    onError: () => {
+      setIsGenerating(false);
+    }
+  });
+
+  if (improvementPlan) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Button variant="outline" onClick={() => setImprovementPlan(null)}>
+            ← Back to Analysis
+          </Button>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {/* Header */}
+            <Card className="border-0 shadow-xl overflow-hidden">
+              <div className="p-8 bg-gradient-to-br from-violet-600 to-purple-700 text-white">
+                <h1 className="text-2xl font-bold mb-2">
+                  Improvement Plan: {improvementPlan.topic}
+                </h1>
+                <p className="text-violet-100">{improvementPlan.encouragement}</p>
+              </div>
+            </Card>
+
+            {/* Root Causes */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Lightbulb className="w-5 h-5 text-amber-500" />
+                  Why This is Difficult
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {improvementPlan.root_causes?.map((cause, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-700">
+                      <span className="text-amber-500 mt-1">•</span>
+                      {cause}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Learning Path */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Target className="w-5 h-5 text-violet-600" />
+                  Your Learning Path
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {improvementPlan.learning_path?.map((step, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 font-bold text-sm">
+                          {step.step}
+                        </div>
+                        {i < improvementPlan.learning_path.length - 1 && (
+                          <div className="w-0.5 h-full bg-violet-200 my-2" />
+                        )}
+                      </div>
+                      <div className="pb-4">
+                        <h4 className="font-semibold text-slate-800">{step.title}</h4>
+                        <p className="text-sm text-slate-600 mt-1">{step.description}</p>
+                        <span className="text-xs text-violet-600 mt-2 inline-block">
+                          ⏱️ {step.duration}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Memory Techniques */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Brain className="w-5 h-5 text-pink-500" />
+                  Memory Techniques & Tricks
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {improvementPlan.memory_techniques?.map((technique, i) => (
+                    <div key={i} className="p-3 bg-pink-50 rounded-xl text-pink-800 text-sm">
+                      💡 {technique}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Common Mistakes */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  Common Mistakes to Avoid
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {improvementPlan.common_mistakes?.map((mistake, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-700">
+                      <span className="text-red-500 mt-1">✗</span>
+                      {mistake}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Daily Routine */}
+            <Card className="border-0 shadow-lg mt-6 bg-gradient-to-r from-emerald-50 to-teal-50">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base text-emerald-800">
+                  📅 Daily Practice Routine
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-emerald-700">{improvementPlan.daily_routine}</p>
+              </CardContent>
+            </Card>
+
+            {/* Free Resources */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BookOpen className="w-5 h-5 text-blue-500" />
+                  Free Resources
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {improvementPlan.free_resources?.map((resource, i) => (
+                    <li key={i} className="p-3 bg-blue-50 rounded-xl text-blue-800 text-sm">
+                      📚 {resource}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Milestones */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  Progress Milestones
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {improvementPlan.milestones?.map((milestone, i) => (
+                    <div key={i} className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl">
+                      <div className="w-6 h-6 rounded-full border-2 border-green-400" />
+                      <span className="text-slate-700 text-sm">{milestone}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Brain className="w-7 h-7 text-violet-600" />
+            Weak Areas Analysis
+          </h1>
+          <p className="text-slate-600 mt-1">Identify gaps and get personalized improvement plans</p>
+        </div>
+
+        {/* No Data State */}
+        {(!performances || performances.length === 0) && (
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <Brain className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+              <h3 className="font-semibold text-slate-800 mb-2">No Performance Data Yet</h3>
+              <p className="text-slate-600 mb-4">
+                Complete some practice quizzes to see your weak areas analysis
+              </p>
+              <Button className="bg-violet-600 hover:bg-violet-700">
+                Go to Practice
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {performances && performances.length > 0 && (
+          <>
+            {/* Subject Performance */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-violet-600" />
+                  Subject Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {subjectAnalysis.map(({ subject, avg, trend }) => (
+                    <div key={subject} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700">{subject}</span>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-semibold ${
+                            avg >= 70 ? 'text-green-600' : avg >= 50 ? 'text-amber-600' : 'text-red-600'
+                          }`}>
+                            {avg.toFixed(0)}%
+                          </span>
+                          {trend !== 0 && (
+                            <TrendingUp className={`w-4 h-4 ${trend > 0 ? 'text-green-500' : 'text-red-500 rotate-180'}`} />
+                          )}
+                        </div>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${
+                            avg >= 70 ? 'bg-green-500' : avg >= 50 ? 'bg-amber-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${avg}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Weak Areas */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                  Topics to Improve
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {weakAreas.length === 0 ? (
+                  <p className="text-slate-500 text-center py-4">
+                    Great job! No significant weak areas identified yet.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {weakAreas.map(([area, data]) => (
+                      <motion.div
+                        key={area}
+                        whileHover={{ scale: 1.01 }}
+                        className="p-4 bg-red-50 rounded-xl border border-red-100 flex items-center justify-between"
+                      >
+                        <div>
+                          <span className="font-medium text-red-800">{area}</span>
+                          <p className="text-sm text-red-600">{data.subject} • Struggled {data.count} times</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => generateImprovementPlan.mutate(area)}
+                          disabled={isGenerating}
+                          className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                          {isGenerating ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <>
+                              Improve
+                              <ArrowRight className="w-4 h-4 ml-1" />
+                            </>
+                          )}
+                        </Button>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Strong Areas */}
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  Your Strengths
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {strongAreas.length === 0 ? (
+                  <p className="text-slate-500 text-center py-4">
+                    Complete more quizzes to discover your strengths!
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {strongAreas.map(([area, data]) => (
+                      <span
+                        key={area}
+                        className="px-4 py-2 bg-green-50 text-green-700 rounded-xl border border-green-200"
+                      >
+                        ✓ {area}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

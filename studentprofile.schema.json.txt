@@ -1,0 +1,56 @@
+{
+  "name": "StudentProfile",
+  "type": "object",
+  "properties": {
+    "full_name": {
+      "type": "string",
+      "description": "Student's full name"
+    },
+    "age": {
+      "type": "number",
+      "description": "Student's age"
+    },
+    "class_grade": {
+      "type": "string",
+      "enum": [
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "Graduate",
+        "Competitive Exam"
+      ],
+      "description": "Current class or exam level"
+    },
+    "exam_target": {
+      "type": "string",
+      "description": "Target exam (Board, JEE, NEET, SSC, UPSC, etc.)"
+    },
+    "subjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Subjects student is studying"
+    },
+    "daily_study_hours": {
+      "type": "number",
+      "description": "Hours available for study daily"
+    },
+    "preferred_language": {
+      "type": "string",
+      "enum": [
+        "English",
+        "Hindi",
+        "Tamil",
+        "Telugu",
+        "Bengali",
+        "Marathi",
+        "Kannada",
+        "Gujarati"
+      ],
+      "default": "English"
+    },
+    "learning_style": {
+ 

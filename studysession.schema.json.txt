@@ -1,0 +1,56 @@
+{
+  "name": "StudySession",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string",
+      "description": "Reference to student"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Subject studied"
+    },
+    "topic": {
+      "type": "string",
+      "description": "Specific topic covered"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Actual study duration"
+    },
+    "planned_duration": {
+      "type": "number",
+      "description": "Planned duration"
+    },
+    "focus_score": {
+      "type": "number",
+      "description": "Self-reported focus 1-10"
+    },
+    "understanding_level": {
+      "type": "string",
+      "enum": [
+        "Struggling",
+        "Getting There",
+        "Understood",
+        "Mastered"
+      ],
+      "description": "Self-assessment of understanding"
+    },
+    "mood_before": {
+      "type": "string",
+      "enum": [
+        "Anxious",
+        "Tired",
+        "Neutral",
+        "Motivated",
+        "Excited"
+      ]
+    },
+    "mood_after": {
+      "type": "string",
+      "enum": [
+        "Frustrated",
+        "Tired",
+        "Satisfied",
+        "Confident",
+ 

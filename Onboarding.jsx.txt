@@ -1,0 +1,477 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useMutation } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
+import { 
+  ChevronRight, 
+  ChevronLeft, 
+  User, 
+  GraduationCap, 
+  Target, 
+  Clock, 
+  Brain,
+  Heart,
+  Loader2,
+  Sparkles
+} from 'lucide-react';
+
+const steps = [
+  { id: 'welcome', title: 'Welcome', icon: Sparkles },
+  { id: 'basics', title: 'Your Details', icon: User },
+  { id: 'academic', title: 'Academic Info', icon: GraduationCap },
+  { id: 'goals', title: 'Your Goals', icon: Target },
+  { id: 'schedule', title: 'Study Schedule', icon: Clock },
+  { id: 'learning', title: 'Learning Style', icon: Brain },
+  { id: 'motivation', title: 'Motivation', icon: Heart }
+];
+
+const classOptions = ['8', '9', '10', '11', '12', 'Graduate', 'Competitive Exam'];
+const examOptions = ['Board Exams', 'JEE', 'NEET', 'SSC', 'UPSC', 'Bank Exams', 'Railway', 'State PSC', 'GATE', 'Other'];
+const subjectOptions = ['Mathematics', 'Physics', 'Chemistry', 'Biology', 'English', 'Hindi', 'History', 'Geography', 'Economics', 'Political Science', 'General Knowledge', 'Reasoning', 'Computer Science'];
+const languageOptions = ['English', 'Hindi', 'Tamil', 'Telugu', 'Bengali', 'Marathi', 'Kannada', 'Gujarati'];
+const learningStyles = ['Visual', 'Reading', 'Practice', 'Mixed'];
+const motivationTypes = ['Career Goal', 'Family Pride', 'Self Improvement', 'Competition', 'Curiosity'];
+const challengeOptions = ['Limited Time', 'No Guidance', 'Lack of Resources', 'Low Confidence', 'Language Barrier', 'Family Responsibilities', 'Financial Constraints'];
+const parentEducation = ['None', 'Primary', 'Secondary', 'Higher Secondary', 'Graduate'];
+
+export default function Onboarding() {
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    age: '',
+    class_grade: '',
+    exam_target: '',
+    subjects: [],
+    daily_study_hours: 3,
+    preferred_language: 'English',
+    learning_style: 'Mixed',
+    motivation_type: '',
+    challenges: [],
+    parent_education: '',
+    confidence_level: 5,
+    streak_days: 0,
+    total_xp: 0,
+    level: 1
+  });
+
+  const createProfileMutation = useMutation({
+    mutationFn: (data) => base44.entities.StudentProfile.create(data),
+    onSuccess: () => {
+      navigate(createPageUrl('Home'));
+    }
+  });
+
+  const handleNext = () => {
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      createProfileMutation.mutate({
+        ...formData,
+        age: parseInt(formData.age) || 16
+      });
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) setCurrentStep(currentStep - 1);
+  };
+
+  const updateField = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const toggleArrayField = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(value)
+        ? prev[field].filter(v => v !== value)
+        : [...prev[field], value]
+    }));
+  };
+
+  const renderStepContent = () => {
+    switch (steps[currentStep].id) {
+      case 'welcome':
+        return (
+          <div className="text-center py-8">
+            <motion.div 
+              initial={{ scale: 0.5 }}
+              animate={{ scale: 1 }}
+              className="w-24 h-24 mx-auto mb-6 rounded-3xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center"
+            >
+              <span className="text-5xl">🎓</span>
+            </motion.div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-3">Welcome to Vidya Saathi!</h2>
+            <p className="text-slate-600 max-w-md mx-auto">
+              Your AI-powered learning companion designed to help first-generation students succeed. 
+              Let's personalize your learning journey!
+            </p>
+            <div className="mt-6 grid grid-cols-3 gap-4 max-w-sm mx-auto">
+              <div className="p-3 rounded-xl bg-violet-50">
+                <div className="text-2xl mb-1">📚</div>
+                <p className="text-xs text-slate-600">Smart Study Plans</p>
+              </div>
+              <div className="p-3 rounded-xl bg-purple-50">
+                <div className="text-2xl mb-1">🤖</div>
+                <p className="text-xs text-slate-600">AI Mentor</p>
+              </div>
+              <div className="p-3 rounded-xl bg-indigo-50">
+                <div className="text-2xl mb-1">🎯</div>
+                <p className="text-xs text-slate-600">Track Progress</p>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'basics':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-700">Your Full Name</Label>
+              <Input
+                value={formData.full_name}
+                onChange={(e) => updateField('full_name', e.target.value)}
+                placeholder="Enter your name"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-700">Your Age</Label>
+              <Input
+                type="number"
+                value={formData.age}
+                onChange={(e) => updateField('age', e.target.value)}
+                placeholder="Enter your age"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-slate-700">Preferred Language</Label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                {languageOptions.map(lang => (
+                  <button
+                    key={lang}
+                    onClick={() => updateField('preferred_language', lang)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                      formData.preferred_language === lang
+                        ? 'bg-violet-100 border-violet-400 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+                    }`}
+                  >
+                    {lang}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'academic':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-700">Current Class/Level</Label>
+              <div className="grid grid-cols-3 md:grid-cols-4 gap-2 mt-2">
+                {classOptions.map(cls => (
+                  <button
+                    key={cls}
+                    onClick={() => updateField('class_grade', cls)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                      formData.class_grade === cls
+                        ? 'bg-violet-100 border-violet-400 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+                    }`}
+                  >
+                    {cls === 'Competitive Exam' ? 'Competitive' : `Class ${cls}`}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-700">Parent's Highest Education</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                {parentEducation.map(edu => (
+                  <button
+                    key={edu}
+                    onClick={() => updateField('parent_education', edu)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                      formData.parent_education === edu
+                        ? 'bg-violet-100 border-violet-400 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+                    }`}
+                  >
+                    {edu}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'goals':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-700">Target Exam</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                {examOptions.map(exam => (
+                  <button
+                    key={exam}
+                    onClick={() => updateField('exam_target', exam)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                      formData.exam_target === exam
+                        ? 'bg-violet-100 border-violet-400 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+                    }`}
+                  >
+                    {exam}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-700">Subjects You're Studying</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                {subjectOptions.map(subject => (
+                  <button
+                    key={subject}
+                    onClick={() => toggleArrayField('subjects', subject)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all ${
+                      formData.subjects.includes(subject)
+                        ? 'bg-violet-100 border-violet-400 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+                    }`}
+                  >
+                    {subject}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'schedule':
+        return (
+          <div className="space-y-6">
+            <div>
+              <Label className="text-slate-700">Hours Available for Study Daily</Label>
+              <div className="mt-4 px-4">
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={formData.daily_study_hours}
+                  onChange={(e) => updateField('daily_study_hours', parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-violet-600"
+                />
+                <div className="flex justify-between mt-2">
+                  <span className="text-sm text-slate-500">1 hour</span>
+                  <span className="text-lg font-bold text-violet-600">{formData.daily_study_hours} hours</span>
+                  <span className="text-sm text-slate-500">10 hours</span>
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-700">Challenges You Face</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {challengeOptions.map(challenge => (
+                  <button
+                    key={challenge}
+                    onClick={() => toggleArrayField('challenges', challenge)}
+                    className={`p-3 rounded-xl border text-sm font-medium transition-all text-left ${
+                      formData.challenges.includes(challenge)
+                        ? 'bg-violet-100 border-violet-400 text-violet-700'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-violet-300'
+                    }`}
+                  >
+                    {challenge}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'learning':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-700">How Do You Learn Best?</Label>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                {[
+                  { type: 'Visual', emoji: '🎬', desc: 'Videos & diagrams' },
+                  { type: 'Reading', emoji: '📖', desc: 'Books & notes' },
+                  { type: 'Practice', emoji: '✍️', desc: 'Solving problems' },
+                  { type: 'Mixed', emoji: '🔀', desc: 'All methods' }
+                ].map(style => (
+                  <button
+                    key={style.type}
+                    onClick={() => updateField('learning_style', style.type)}
+                    className={`p-4 rounded-xl border text-left transition-all ${
+                      formData.learning_style === style.type
+                        ? 'bg-violet-100 border-violet-400'
+                        : 'bg-white border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-2">{style.emoji}</div>
+                    <div className="font-medium text-slate-800">{style.type}</div>
+                    <div className="text-xs text-slate-500">{style.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'motivation':
+        return (
+          <div className="space-y-6">
+            <div>
+              <Label className="text-slate-700">What Motivates You Most?</Label>
+              <div className="grid grid-cols-1 gap-2 mt-3">
+                {[
+                  { type: 'Career Goal', emoji: '💼', desc: 'Building a successful career' },
+                  { type: 'Family Pride', emoji: '👨‍👩‍👧', desc: 'Making my family proud' },
+                  { type: 'Self Improvement', emoji: '🌱', desc: 'Becoming the best version of myself' },
+                  { type: 'Competition', emoji: '🏆', desc: 'Achieving high ranks' },
+                  { type: 'Curiosity', emoji: '💡', desc: 'Learning new things' }
+                ].map(motive => (
+                  <button
+                    key={motive.type}
+                    onClick={() => updateField('motivation_type', motive.type)}
+                    className={`p-4 rounded-xl border flex items-center gap-4 text-left transition-all ${
+                      formData.motivation_type === motive.type
+                        ? 'bg-violet-100 border-violet-400'
+                        : 'bg-white border-slate-200 hover:border-violet-300'
+                    }`}
+                  >
+                    <div className="text-2xl">{motive.emoji}</div>
+                    <div>
+                      <div className="font-medium text-slate-800">{motive.type}</div>
+                      <div className="text-sm text-slate-500">{motive.desc}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label className="text-slate-700">How Confident Do You Feel About Your Studies?</Label>
+              <div className="mt-4 px-4">
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={formData.confidence_level}
+                  onChange={(e) => updateField('confidence_level', parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-violet-600"
+                />
+                <div className="flex justify-between mt-2">
+                  <span className="text-sm text-slate-500">Low</span>
+                  <span className="text-lg font-bold text-violet-600">{formData.confidence_level}/10</span>
+                  <span className="text-sm text-slate-500">High</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
+
+  const canProceed = () => {
+    switch (steps[currentStep].id) {
+      case 'basics': return formData.full_name.length > 0;
+      case 'academic': return formData.class_grade.length > 0;
+      case 'goals': return formData.subjects.length > 0;
+      default: return true;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 py-8 px-4">
+      <div className="max-w-2xl mx-auto">
+        {/* Progress Steps */}
+        <div className="flex items-center justify-center mb-8 overflow-x-auto pb-2">
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            return (
+              <div key={step.id} className="flex items-center">
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
+                  index <= currentStep 
+                    ? 'bg-violet-600 text-white' 
+                    : 'bg-slate-200 text-slate-500'
+                }`}>
+                  <Icon className="w-5 h-5" />
+                </div>
+                {index < steps.length - 1 && (
+                  <div className={`w-8 h-1 mx-1 rounded ${
+                    index < currentStep ? 'bg-violet-600' : 'bg-slate-200'
+                  }`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Step Content */}
+        <Card className="border-0 shadow-xl">
+          <CardContent className="p-6 md:p-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <h2 className="text-xl font-bold text-slate-800 mb-6">{steps[currentStep].title}</h2>
+                {renderStepContent()}
+              </motion.div>
+            </AnimatePresence>
+
+            {/* Navigation */}
+            <div className="flex justify-between mt-8 pt-6 border-t">
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStep === 0}
+                className="gap-2"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Back
+              </Button>
+              <Button
+                onClick={handleNext}
+                disabled={!canProceed() || createProfileMutation.isPending}
+                className="gap-2 bg-violet-600 hover:bg-violet-700"
+              >
+                {createProfileMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : currentStep === steps.length - 1 ? (
+                  <>
+                    Complete Setup
+                    <Sparkles className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

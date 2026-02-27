@@ -1,0 +1,96 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Flame, Star, Zap, Trophy } from 'lucide-react';
+
+export default function WelcomeCard({ profile, currentTime }) {
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const getMotivationalMessage = () => {
+    const messages = [
+      "Every expert was once a beginner. Keep going! 💪",
+      "Your future self will thank you for studying today.",
+      "Small steps every day lead to big achievements.",
+      "You're building a better tomorrow, one lesson at a time.",
+      "First-generation success stories start with dedication like yours."
+    ];
+    return messages[Math.floor(Math.random() * messages.length)];
+  };
+
+  const levelProgress = ((profile?.total_xp || 0) % 1000) / 10;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 p-6 md:p-8 text-white"
+    >
+      {/* Decorative elements */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32" />
+      <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-24 -translate-x-24" />
+      
+      <div className="relative z-10">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <p className="text-violet-200 text-sm font-medium mb-1">{getGreeting()}</p>
+            <h1 className="text-2xl md:text-3xl font-bold mb-2">
+              {profile?.full_name || 'Student'} 
+              <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-white/20 text-sm font-medium">
+                Level {profile?.level || 1}
+              </span>
+            </h1>
+            <p className="text-violet-100 text-sm md:text-base max-w-md">
+              {getMotivationalMessage()}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4 md:gap-6">
+            {/* Streak */}
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              className="flex flex-col items-center p-3 bg-white/10 rounded-2xl backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-1 text-orange-300">
+                <Flame className="w-5 h-5" />
+                <span className="text-xl font-bold">{profile?.streak_days || 0}</span>
+              </div>
+              <span className="text-xs text-violet-200">Day Streak</span>
+            </motion.div>
+
+            {/* XP */}
+            <motion.div 
+              whileHover={{ scale: 1.05 }}
+              className="flex flex-col items-center p-3 bg-white/10 rounded-2xl backdrop-blur-sm"
+            >
+              <div className="flex items-center gap-1 text-yellow-300">
+                <Star className="w-5 h-5" />
+                <span className="text-xl font-bold">{profile?.total_xp || 0}</span>
+              </div>
+              <span className="text-xs text-violet-200">Total XP</span>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Level Progress */}
+        <div className="mt-6">
+          <div className="flex items-center justify-between text-sm mb-2">
+            <span className="text-violet-200">Level Progress</span>
+            <span className="text-white font-medium">{levelProgress.toFixed(0)}%</span>
+          </div>
+          <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${levelProgress}%` }}
+              transition={{ duration: 1, delay: 0.3 }}
+              className="h-full bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full"
+            />
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

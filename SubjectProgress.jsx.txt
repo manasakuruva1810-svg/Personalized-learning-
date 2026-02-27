@@ -1,0 +1,108 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BookOpen, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+
+const subjectColors = {
+  Mathematics: { bg: 'bg-blue-50', text: 'text-blue-600', progress: 'bg-blue-500' },
+  Physics: { bg: 'bg-purple-50', text: 'text-purple-600', progress: 'bg-purple-500' },
+  Chemistry: { bg: 'bg-green-50', text: 'text-green-600', progress: 'bg-green-500' },
+  Biology: { bg: 'bg-emerald-50', text: 'text-emerald-600', progress: 'bg-emerald-500' },
+  English: { bg: 'bg-rose-50', text: 'text-rose-600', progress: 'bg-rose-500' },
+  Hindi: { bg: 'bg-orange-50', text: 'text-orange-600', progress: 'bg-orange-500' },
+  History: { bg: 'bg-amber-50', text: 'text-amber-600', progress: 'bg-amber-500' },
+  Geography: { bg: 'bg-teal-50', text: 'text-teal-600', progress: 'bg-teal-500' },
+  'General Knowledge': { bg: 'bg-indigo-50', text: 'text-indigo-600', progress: 'bg-indigo-500' },
+  Reasoning: { bg: 'bg-cyan-50', text: 'text-cyan-600', progress: 'bg-cyan-500' }
+};
+
+const defaultColor = { bg: 'bg-slate-50', text: 'text-slate-600', progress: 'bg-slate-500' };
+
+export default function SubjectProgress({ performances }) {
+  // Calculate subject-wise progress
+  const subjectData = {};
+  
+  performances?.forEach(perf => {
+    if (!subjectData[perf.subject]) {
+      subjectData[perf.subject] = { scores: [], total: 0, count: 0 };
+    }
+    subjectData[perf.subject].scores.push(perf.percentage || (perf.score / perf.max_score * 100));
+    subjectData[perf.subject].total += perf.percentage || (perf.score / perf.max_score * 100);
+    subjectData[perf.subject].count++;
+  });
+
+  const subjects = Object.entries(subjectData).map(([name, data]) => {
+    const avgScore = data.total / data.count;
+    const lastTwo = data.scores.slice(-2);
+    let trend = 'stable';
+    if (lastTwo.length === 2) {
+      const diff = lastTwo[1] - lastTwo[0];
+      if (diff > 5) trend = 'up';
+      else if (diff < -5) trend = 'down';
+    }
+    return { name, avgScore, trend, tests: data.count };
+  }).sort((a, b) => b.avgScore - a.avgScore);
+
+  const TrendIcon = ({ trend }) => {
+    if (trend === 'up') return <TrendingUp className="w-4 h-4 text-green-500" />;
+    if (trend === 'down') return <TrendingDown className="w-4 h-4 text-red-500" />;
+    return <Minus className="w-4 h-4 text-slate-400" />;
+  };
+
+  return (
+    <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+          <BookOpen className="w-5 h-5 text-violet-600" />
+          Subject Progress
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        {subjects.length === 0 ? (
+          <div className="text-center py-6 text-slate-500">
+            <BookOpen className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+            <p className="text-sm">Complete practice tests to see your progress!</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {subjects.slice(0, 5).map((subject, index) => {
+              const colors = subjectColors[subject.name] || defaultColor;
+              return (
+                <motion.div
+                  key={subject.name}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-lg ${colors.bg} ${colors.text} text-xs font-medium`}>
+                        {subject.name}
+                      </span>
+                      <TrendIcon trend={subject.trend} />
+                    </div>
+                    <span className="text-sm font-semibold text-slate-700">
+                      {subject.avgScore.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${subject.avgScore}%` }}
+                      transition={{ duration: 0.8, delay: index * 0.1 }}
+                      className={`h-full ${colors.progress} rounded-full`}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500">{subject.tests} tests completed</p>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

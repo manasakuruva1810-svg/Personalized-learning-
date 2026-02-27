@@ -1,0 +1,55 @@
+{
+  "name": "Achievement",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string"
+    },
+    "achievement_type": {
+      "type": "string",
+      "enum": [
+        "Streak",
+        "Mastery",
+        "Consistency",
+        "Improvement",
+        "Milestone",
+        "Special"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "icon": {
+      "type": "string"
+    },
+    "xp_reward": {
+      "type": "number"
+    },
+    "unlocked_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "subject": {
+      "type": "string",
+      "description": "Related subject if applicable"
+    },
+    "rarity": {
+      "type": "string",
+      "enum": [
+        "Common",
+        "Rare",
+        "Epic",
+        "Legendary"
+      ]
+    }
+  },
+  "required": [
+    "achievement_type",
+    "title",
+    "xp_reward",
+    "unlocked_date"
+  ]
+}

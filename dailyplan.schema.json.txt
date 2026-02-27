@@ -1,0 +1,81 @@
+{
+  "name": "DailyPlan",
+  "type": "object",
+  "properties": {
+    "student_id": {
+      "type": "string"
+    },
+    "plan_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "duration_minutes": {
+            "type": "number"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "High",
+              "Medium",
+              "Low"
+            ]
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "start_time": {
+            "type": "string"
+          },
+          "task_type": {
+            "type": "string",
+            "enum": [
+              "Learn",
+              "Practice",
+              "Revise",
+              "Test"
+            ]
+          }
+        }
+      }
+    },
+    "total_planned_minutes": {
+      "type": "number"
+    },
+    "completed_minutes": {
+      "type": "number",
+      "default": 0
+    },
+    "ai_recommendation": {
+      "type": "string",
+      "description": "AI generated recommendation for the day"
+    },
+    "motivation_quote": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Planned",
+        "In Progress",
+        "Completed",
+        "Partial"
+      ],
+      "default": "Planned"
+    }
+  },
+  "required": [
+    "plan_date",
+    "tasks"
+  ]
+}

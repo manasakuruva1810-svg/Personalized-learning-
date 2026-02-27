@@ -1,0 +1,93 @@
+import React from 'react';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { 
+  MessageCircle, 
+  CalendarDays, 
+  Target, 
+  Compass, 
+  Brain,
+  Trophy,
+  BookMarked,
+  HelpCircle
+} from 'lucide-react';
+
+const actions = [
+  { 
+    icon: MessageCircle, 
+    label: 'AI Mentor', 
+    desc: 'Get guidance',
+    page: 'AIMentor',
+    gradient: 'from-violet-500 to-purple-600',
+    bgLight: 'bg-violet-50'
+  },
+  { 
+    icon: CalendarDays, 
+    label: 'Study Plan', 
+    desc: 'Plan your day',
+    page: 'StudyPlanner',
+    gradient: 'from-blue-500 to-cyan-600',
+    bgLight: 'bg-blue-50'
+  },
+  { 
+    icon: Target, 
+    label: 'Practice', 
+    desc: 'Test yourself',
+    page: 'Practice',
+    gradient: 'from-emerald-500 to-teal-600',
+    bgLight: 'bg-emerald-50'
+  },
+  { 
+    icon: Compass, 
+    label: 'Career Guide', 
+    desc: 'Explore paths',
+    page: 'CareerExplorer',
+    gradient: 'from-orange-500 to-amber-600',
+    bgLight: 'bg-orange-50'
+  },
+  { 
+    icon: Brain, 
+    label: 'Weak Areas', 
+    desc: 'Improve gaps',
+    page: 'WeakAreas',
+    gradient: 'from-rose-500 to-pink-600',
+    bgLight: 'bg-rose-50'
+  },
+  { 
+    icon: Trophy, 
+    label: 'Achievements', 
+    desc: 'Your badges',
+    page: 'Achievements',
+    gradient: 'from-amber-500 to-yellow-600',
+    bgLight: 'bg-amber-50'
+  }
+];
+
+export default function QuickActions() {
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {actions.map((action, index) => {
+        const Icon = action.icon;
+        return (
+          <motion.div
+            key={action.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+          >
+            <Link to={createPageUrl(action.page)}>
+              <div className={`group p-4 rounded-2xl ${action.bgLight} border border-transparent hover:border-slate-200 hover:shadow-lg transition-all duration-300 cursor-pointer`}>
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${action.gradient} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                  <Icon className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="font-semibold text-slate-800 text-sm">{action.label}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{action.desc}</p>
+              </div>
+            </Link>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}

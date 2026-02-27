@@ -1,0 +1,88 @@
+{
+  "name": "CareerPath",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Engineering",
+        "Medical",
+        "Government",
+        "Business",
+        "Creative",
+        "Research",
+        "Teaching",
+        "Law",
+        "Defense",
+        "Sports",
+        "Technology"
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "required_exams": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "key_subjects": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skills_needed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "average_salary_range": {
+      "type": "string"
+    },
+    "difficulty_level": {
+      "type": "string",
+      "enum": [
+        "Moderate",
+        "Challenging",
+        "Highly Competitive"
+      ]
+    },
+    "preparation_years": {
+      "type": "number"
+    },
+    "success_stories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "background": {
+            "type": "string"
+          },
+          "story": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "resources": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "title",
+    "category",
+    "description"
+  ]
+}

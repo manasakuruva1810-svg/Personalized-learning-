@@ -1,0 +1,96 @@
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, CheckCircle2, Circle, BookOpen, PenTool, RotateCcw, FileText, Sparkles } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
+
+const taskIcons = {
+  Learn: BookOpen,
+  Practice: PenTool,
+  Revise: RotateCcw,
+  Test: FileText
+};
+
+const priorityColors = {
+  High: 'bg-red-100 text-red-700 border-red-200',
+  Medium: 'bg-amber-100 text-amber-700 border-amber-200',
+  Low: 'bg-green-100 text-green-700 border-green-200'
+};
+
+export default function TodaysPlan({ plan, onTaskComplete, onGeneratePlan }) {
+  const tasks = plan?.tasks || [];
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const progress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+
+  return (
+    <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-violet-600" />
+            Today's Study Plan
+          </CardTitle>
+          {tasks.length === 0 && (
+            <Button 
+              onClick={onGeneratePlan}
+              size="sm"
+              className="bg-violet-600 hover:bg-violet-700 text-white"
+            >
+              <Sparkles className="w-4 h-4 mr-1" />
+              Generate Plan
+            </Button>
+          )}
+        </div>
+        
+        {tasks.length > 0 && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-sm mb-1">
+              <span className="text-slate-600">{completedTasks} of {tasks.length} completed</span>
+              <span className="font-medium text-violet-600">{progress.toFixed(0)}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        )}
+      </CardHeader>
+
+      <CardContent className="pt-4">
+        {plan?.ai_recommendation && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="p-3 mb-4 rounded-xl bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100"
+          >
+            <p className="text-sm text-violet-700 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              {plan.ai_recommendation}
+            </p>
+          </motion.div>
+        )}
+
+        <AnimatePresence>
+          {tasks.length === 0 ? (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center py-8 text-slate-500"
+            >
+              <BookOpen className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+              <p>No plan for today yet.</p>
+              <p className="text-sm">Let AI create a personalized study plan for you!</p>
+            </motion.div>
+          ) : (
+            <div className="space-y-3">
+              {tasks.map((task, index) => {
+                const Icon = taskIcons[task.task_type] || BookOpen;
+                return (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`p-4 rounded-xl border transition-all ${
+                      task.completed 
+                        ? 'bg-green-50 border-green-200' 
+                        : 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-sm'
+ 

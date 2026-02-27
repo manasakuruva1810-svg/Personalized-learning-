@@ -1,0 +1,192 @@
+import React, { useState, useEffect } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
+import { createPageUrl } from '@/utils';
+import { Loader2, Settings } from 'lucide-react';
+
+import WelcomeCard from '@/components/dashboard/WelcomeCard';
+import TodaysPlan from '@/components/dashboard/TodaysPlan';
+import ProgressChart from '@/components/dashboard/ProgressChart';
+import QuickActions from '@/components/dashboard/QuickActions';
+import RecentAchievements from '@/components/dashboard/RecentAchievements';
+import SubjectProgress from '@/components/dashboard/SubjectProgress';
+
+export default function Home() {
+  const queryClient = useQueryClient();
+  const today = new Date().toISOString().split('T')[0];
+
+  // Fetch user profile
+  const { data: profiles, isLoading: loadingProfile } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => base44.entities.StudentProfile.list(),
+  });
+  const profile = profiles?.[0];
+
+  // Fetch today's plan
+  const { data: plans, isLoading: loadingPlan } = useQuery({
+    queryKey: ['todayPlan', today],
+    queryFn: () => base44.entities.DailyPlan.filter({ plan_date: today }),
+  });
+  const todayPlan = plans?.[0];
+
+  // Fetch recent sessions
+  const { data: sessions } = useQuery({
+    queryKey: ['recentSessions'],
+    queryFn: () => base44.entities.StudySession.list('-session_date', 50),
+  });
+
+  // Fetch achievements
+  const { data: achievements } = useQuery({
+    queryKey: ['achievements'],
+    queryFn: () => base44.entities.Achievement.list('-unlocked_date', 10),
+  });
+
+  // Fetch performance records
+  const { data: performances } = useQuery({
+    queryKey: ['performances'],
+    queryFn: () => base44.entities.PerformanceRecord.list('-assessment_date', 50),
+  });
+
+  // Generate study plan
+  const generatePlanMutation = useMutation({
+    mutationFn: async () => {
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generate a personalized study plan for a student with the following profile:
+        Name: ${profile?.full_name || 'Student'}
+        Class: ${profile?.class_grade || '10'}
+        Target: ${profile?.exam_target || 'Board Exams'}
+        Subjects: ${profile?.subjects?.join(', ') || 'Mathematics, Science, English'}
+        Daily Study Hours: ${profile?.daily_study_hours || 3}
+        Learning Style: ${profile?.learning_style || 'Mixed'}
+        
+        Create a balanced study plan for today with specific topics. Include a mix of learning, practice, and revision.
+        Also provide an AI recommendation and a motivational quote.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            tasks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  subject: { type: "string" },
+                  topic: { type: "string" },
+                  duration_minutes: { type: "number" },
+                  priority: { type: "string", enum: ["High", "Medium", "Low"] },
+                  task_type: { type: "string", enum: ["Learn", "Practice", "Revise", "Test"] },
+                  start_time: { type: "string" }
+                }
+              }
+            },
+            ai_recommendation: { type: "string" },
+            motivation_quote: { type: "string" },
+            total_planned_minutes: { type: "number" }
+          }
+        }
+      });
+
+      const plan = {
+        plan_date: today,
+        tasks: response.tasks.map(t => ({ ...t, completed: false })),
+        ai_recommendation: response.ai_recommendation,
+        motivation_quote: response.motivation_quote,
+        total_planned_minutes: response.total_planned_minutes,
+        status: 'Planned'
+      };
+
+      return base44.entities.DailyPlan.create(plan);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todayPlan'] });
+    }
+  });
+
+  // Update task completion
+  const updateTaskMutation = useMutation({
+    mutationFn: async (taskIndex) => {
+      const updatedTasks = todayPlan.tasks.map((task, idx) => 
+        idx === taskIndex ? { ...task, completed: !task.completed } : task
+      );
+      const completedMinutes = updatedTasks
+        .filter(t => t.completed)
+        .reduce((sum, t) => sum + t.duration_minutes, 0);
+      
+      return base44.entities.DailyPlan.update(todayPlan.id, {
+        tasks: updatedTasks,
+        completed_minutes: completedMinutes,
+        status: updatedTasks.every(t => t.completed) ? 'Completed' : 
+                updatedTasks.some(t => t.completed) ? 'In Progress' : 'Planned'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['todayPlan'] });
+    }
+  });
+
+  if (loadingProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-violet-50">
+        <Loader2 className="w-8 h-8 animate-spin text-violet-600" />
+      </div>
+    );
+  }
+
+  // Show onboarding if no profile
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-violet-50 p-4">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center max-w-md"
+        >
+          <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+            <span className="text-3xl">🎓</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Welcome to Vidya Saathi</h1>
+          <p className="text-slate-600 mb-6">Your AI-powered learning companion. Let's set up your profile to get started!</p>
+          <Link 
+            to={createPageUrl('Onboarding')}
+            className="inline-flex items-center px-6 py-3 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold hover:from-violet-700 hover:to-purple-700 transition-all shadow-lg shadow-violet-200"
+          >
+            Get Started
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50">
+      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Welcome Section */}
+        <WelcomeCard profile={profile} />
+
+        {/* Quick Actions */}
+        <QuickActions />
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Today's Plan */}
+          <div className="lg:col-span-2 space-y-6">
+            <TodaysPlan 
+              plan={todayPlan}
+              onTaskComplete={(idx) => updateTaskMutation.mutate(idx)}
+              onGeneratePlan={() => generatePlanMutation.mutate()}
+            />
+            
+            <ProgressChart sessions={sessions} />
+          </div>
+
+          {/* Right Column - Stats */}
+          <div className="space-y-6">
+            <SubjectProgress performances={performances} />
+            <RecentAchievements achievements={achievements} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

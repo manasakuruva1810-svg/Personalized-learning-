@@ -1,0 +1,197 @@
+import React from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Trophy,
+  Star,
+  Flame,
+  Target,
+  Award,
+  Zap,
+  Lock,
+  Crown,
+  Medal,
+  BookOpen,
+  Clock,
+  Brain
+} from 'lucide-react';
+
+const allAchievements = [
+  // Streak achievements
+  { id: 'streak_3', title: 'Getting Started', description: 'Maintain a 3-day study streak', type: 'Streak', xp: 50, rarity: 'Common', icon: Flame, requirement: 3 },
+  { id: 'streak_7', title: 'Week Warrior', description: 'Maintain a 7-day study streak', type: 'Streak', xp: 100, rarity: 'Common', icon: Flame, requirement: 7 },
+  { id: 'streak_30', title: 'Monthly Master', description: 'Maintain a 30-day study streak', type: 'Streak', xp: 500, rarity: 'Rare', icon: Flame, requirement: 30 },
+  { id: 'streak_100', title: 'Centurion', description: 'Maintain a 100-day study streak', type: 'Streak', xp: 1000, rarity: 'Epic', icon: Flame, requirement: 100 },
+  
+  // Mastery achievements
+  { id: 'first_quiz', title: 'First Steps', description: 'Complete your first quiz', type: 'Mastery', xp: 25, rarity: 'Common', icon: Target },
+  { id: 'quiz_10', title: 'Quiz Enthusiast', description: 'Complete 10 quizzes', type: 'Mastery', xp: 100, rarity: 'Common', icon: Target },
+  { id: 'quiz_50', title: 'Quiz Master', description: 'Complete 50 quizzes', type: 'Mastery', xp: 300, rarity: 'Rare', icon: Target },
+  { id: 'perfect_score', title: 'Perfectionist', description: 'Score 100% on any quiz', type: 'Mastery', xp: 200, rarity: 'Rare', icon: Star },
+  
+  // Consistency achievements
+  { id: 'early_bird', title: 'Early Bird', description: 'Study before 7 AM', type: 'Consistency', xp: 50, rarity: 'Common', icon: Clock },
+  { id: 'night_owl', title: 'Night Owl', description: 'Complete a study session after 10 PM', type: 'Consistency', xp: 50, rarity: 'Common', icon: Clock },
+  { id: 'weekend_warrior', title: 'Weekend Warrior', description: 'Study on both Saturday and Sunday', type: 'Consistency', xp: 75, rarity: 'Common', icon: Clock },
+  
+  // Improvement achievements
+  { id: 'comeback', title: 'Comeback King', description: 'Improve score by 20% in a subject', type: 'Improvement', xp: 150, rarity: 'Rare', icon: Zap },
+  { id: 'weak_conquered', title: 'Weakness Conquered', description: 'Turn a weak area into a strength', type: 'Improvement', xp: 250, rarity: 'Epic', icon: Brain },
+  
+  // Milestone achievements
+  { id: 'xp_1000', title: 'Rising Star', description: 'Earn 1,000 XP', type: 'Milestone', xp: 100, rarity: 'Common', icon: Star, requirement: 1000 },
+  { id: 'xp_5000', title: 'Shining Bright', description: 'Earn 5,000 XP', type: 'Milestone', xp: 250, rarity: 'Rare', icon: Star, requirement: 5000 },
+  { id: 'xp_10000', title: 'Superstar', description: 'Earn 10,000 XP', type: 'Milestone', xp: 500, rarity: 'Epic', icon: Crown, requirement: 10000 },
+  { id: 'level_5', title: 'Level Up!', description: 'Reach Level 5', type: 'Milestone', xp: 100, rarity: 'Common', icon: Award },
+  { id: 'level_10', title: 'Double Digits', description: 'Reach Level 10', type: 'Milestone', xp: 250, rarity: 'Rare', icon: Award },
+  
+  // Special achievements
+  { id: 'first_plan', title: 'Planner', description: 'Create your first AI study plan', type: 'Special', xp: 50, rarity: 'Common', icon: BookOpen },
+  { id: 'mentor_chat', title: 'Seeking Guidance', description: 'Have your first chat with AI Mentor', type: 'Special', xp: 50, rarity: 'Common', icon: Brain },
+  { id: 'career_explored', title: 'Future Thinker', description: 'Explore your first career path', type: 'Special', xp: 75, rarity: 'Common', icon: Trophy }
+];
+
+const rarityColors = {
+  Common: { bg: 'from-slate-400 to-slate-500', border: 'border-slate-300', text: 'text-slate-600' },
+  Rare: { bg: 'from-blue-400 to-blue-600', border: 'border-blue-300', text: 'text-blue-600' },
+  Epic: { bg: 'from-purple-400 to-purple-600', border: 'border-purple-300', text: 'text-purple-600' },
+  Legendary: { bg: 'from-amber-400 to-orange-500', border: 'border-amber-300', text: 'text-amber-600' }
+};
+
+export default function Achievements() {
+  const { data: profiles } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => base44.entities.StudentProfile.list(),
+  });
+  const profile = profiles?.[0];
+
+  const { data: unlockedAchievements } = useQuery({
+    queryKey: ['achievements'],
+    queryFn: () => base44.entities.Achievement.list(),
+  });
+
+  const unlockedIds = new Set(unlockedAchievements?.map(a => a.title) || []);
+  const totalXP = unlockedAchievements?.reduce((sum, a) => sum + (a.xp_reward || 0), 0) || 0;
+  const unlockedCount = unlockedAchievements?.length || 0;
+
+  // Group by type
+  const achievementsByType = {};
+  allAchievements.forEach(ach => {
+    if (!achievementsByType[ach.type]) achievementsByType[ach.type] = [];
+    achievementsByType[ach.type].push({
+      ...ach,
+      unlocked: unlockedIds.has(ach.title)
+    });
+  });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Trophy className="w-7 h-7 text-amber-500" />
+            Achievements
+          </h1>
+          <p className="text-slate-600 mt-1">Your badges of honor and progress</p>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white">
+            <CardContent className="p-4 text-center">
+              <Trophy className="w-8 h-8 mx-auto mb-2 opacity-80" />
+              <p className="text-3xl font-bold">{unlockedCount}</p>
+              <p className="text-sm opacity-80">Unlocked</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
+            <CardContent className="p-4 text-center">
+              <Star className="w-8 h-8 mx-auto mb-2 opacity-80" />
+              <p className="text-3xl font-bold">{totalXP}</p>
+              <p className="text-sm opacity-80">XP Earned</p>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+            <CardContent className="p-4 text-center">
+              <Medal className="w-8 h-8 mx-auto mb-2 opacity-80" />
+              <p className="text-3xl font-bold">
+                {Math.round((unlockedCount / allAchievements.length) * 100)}%
+              </p>
+              <p className="text-sm opacity-80">Complete</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Achievement Categories */}
+        {Object.entries(achievementsByType).map(([type, achievements]) => (
+          <Card key={type} className="border-0 shadow-lg">
+            <CardHeader>
+              <CardTitle className="text-lg">{type} Achievements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {achievements.map((ach) => {
+                  const Icon = ach.icon;
+                  const colors = rarityColors[ach.rarity];
+                  
+                  return (
+                    <motion.div
+                      key={ach.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className={`relative p-4 rounded-2xl border-2 transition-all ${
+                        ach.unlocked 
+                          ? `${colors.border} bg-white` 
+                          : 'border-slate-200 bg-slate-50 opacity-60'
+                      }`}
+                    >
+                      {!ach.unlocked && (
+                        <div className="absolute top-3 right-3">
+                          <Lock className="w-4 h-4 text-slate-400" />
+                        </div>
+                      )}
+                      
+                      <div className="flex items-start gap-4">
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+                          ach.unlocked 
+                            ? `bg-gradient-to-br ${colors.bg}` 
+                            : 'bg-slate-200'
+                        }`}>
+                          <Icon className={`w-7 h-7 ${ach.unlocked ? 'text-white' : 'text-slate-400'}`} />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className={`font-semibold ${ach.unlocked ? 'text-slate-800' : 'text-slate-500'}`}>
+                              {ach.title}
+                            </h3>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              ach.unlocked 
+                                ? `bg-${ach.rarity === 'Common' ? 'slate' : ach.rarity === 'Rare' ? 'blue' : ach.rarity === 'Epic' ? 'purple' : 'amber'}-100 ${colors.text}` 
+                                : 'bg-slate-100 text-slate-400'
+                            }`}>
+                              {ach.rarity}
+                            </span>
+                          </div>
+                          <p className={`text-sm ${ach.unlocked ? 'text-slate-600' : 'text-slate-400'}`}>
+                            {ach.description}
+                          </p>
+                          <p className={`text-sm mt-2 font-medium ${ach.unlocked ? colors.text : 'text-slate-400'}`}>
+                            +{ach.xp} XP
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}

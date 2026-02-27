@@ -1,0 +1,453 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Calendar,
+  Clock,
+  Plus,
+  Sparkles,
+  CheckCircle2,
+  Circle,
+  Trash2,
+  Loader2,
+  CalendarDays,
+  BarChart3,
+  BookOpen,
+  PenTool,
+  RotateCcw,
+  FileText
+} from 'lucide-react';
+import { format, addDays, startOfWeek } from 'date-fns';
+
+const taskIcons = {
+  Learn: BookOpen,
+  Practice: PenTool,
+  Revise: RotateCcw,
+  Test: FileText
+};
+
+export default function StudyPlanner() {
+  const queryClient = useQueryClient();
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showAddTask, setShowAddTask] = useState(false);
+  const [newTask, setNewTask] = useState({
+    subject: '',
+    topic: '',
+    duration_minutes: 30,
+    priority: 'Medium',
+    task_type: 'Learn',
+    start_time: ''
+  });
+
+  const dateString = format(selectedDate, 'yyyy-MM-dd');
+
+  const { data: profiles } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => base44.entities.StudentProfile.list(),
+  });
+  const profile = profiles?.[0];
+
+  const { data: plans, isLoading } = useQuery({
+    queryKey: ['plans', dateString],
+    queryFn: () => base44.entities.DailyPlan.filter({ plan_date: dateString }),
+  });
+  const currentPlan = plans?.[0];
+
+  const generatePlanMutation = useMutation({
+    mutationFn: async () => {
+      setIsGenerating(true);
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generate a personalized study plan for ${format(selectedDate, 'EEEE, MMMM d, yyyy')}.
+
+Student Profile:
+- Name: ${profile?.full_name || 'Student'}
+- Class: ${profile?.class_grade || '10'}
+- Target Exam: ${profile?.exam_target || 'Board Exams'}
+- Subjects: ${profile?.subjects?.join(', ') || 'Mathematics, Science, English'}
+- Daily Study Hours: ${profile?.daily_study_hours || 3}
+- Learning Style: ${profile?.learning_style || 'Mixed'}
+- Challenges: ${profile?.challenges?.join(', ') || 'None specified'}
+
+Create a balanced, achievable study plan with:
+- Mix of learning new topics, practice, and revision
+- Breaks between sessions
+- Appropriate difficulty progression
+- Start times considering typical student schedule (after school hours)
+
+Provide motivational advice specific to their situation.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            tasks: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  subject: { type: "string" },
+                  topic: { type: "string" },
+                  duration_minutes: { type: "number" },
+                  priority: { type: "string", enum: ["High", "Medium", "Low"] },
+                  task_type: { type: "string", enum: ["Learn", "Practice", "Revise", "Test"] },
+                  start_time: { type: "string" }
+                }
+              }
+            },
+            ai_recommendation: { type: "string" },
+            motivation_quote: { type: "string" },
+            total_planned_minutes: { type: "number" }
+          }
+        }
+      });
+
+      const plan = {
+        plan_date: dateString,
+        tasks: response.tasks.map(t => ({ ...t, completed: false })),
+        ai_recommendation: response.ai_recommendation,
+        motivation_quote: response.motivation_quote,
+        total_planned_minutes: response.total_planned_minutes,
+        status: 'Planned'
+      };
+
+      if (currentPlan) {
+        return base44.entities.DailyPlan.update(currentPlan.id, plan);
+      }
+      return base44.entities.DailyPlan.create(plan);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      setIsGenerating(false);
+    },
+    onError: () => {
+      setIsGenerating(false);
+    }
+  });
+
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskIndex, completed }) => {
+      const updatedTasks = currentPlan.tasks.map((task, idx) =>
+        idx === taskIndex ? { ...task, completed } : task
+      );
+      const completedMinutes = updatedTasks
+        .filter(t => t.completed)
+        .reduce((sum, t) => sum + t.duration_minutes, 0);
+
+      return base44.entities.DailyPlan.update(currentPlan.id, {
+        tasks: updatedTasks,
+        completed_minutes: completedMinutes,
+        status: updatedTasks.every(t => t.completed) ? 'Completed' :
+                updatedTasks.some(t => t.completed) ? 'In Progress' : 'Planned'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+    }
+  });
+
+  const addTaskMutation = useMutation({
+    mutationFn: async () => {
+      const tasks = [...(currentPlan?.tasks || []), { ...newTask, completed: false }];
+      const totalMinutes = tasks.reduce((sum, t) => sum + t.duration_minutes, 0);
+
+      if (currentPlan) {
+        return base44.entities.DailyPlan.update(currentPlan.id, { tasks, total_planned_minutes: totalMinutes });
+      }
+      return base44.entities.DailyPlan.create({
+        plan_date: dateString,
+        tasks,
+        total_planned_minutes: totalMinutes,
+        status: 'Planned'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+      setShowAddTask(false);
+      setNewTask({ subject: '', topic: '', duration_minutes: 30, priority: 'Medium', task_type: 'Learn', start_time: '' });
+    }
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (taskIndex) => {
+      const tasks = currentPlan.tasks.filter((_, idx) => idx !== taskIndex);
+      return base44.entities.DailyPlan.update(currentPlan.id, { tasks });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plans'] });
+    }
+  });
+
+  // Week navigation
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  const tasks = currentPlan?.tasks || [];
+  const completedTasks = tasks.filter(t => t.completed).length;
+  const progress = tasks.length > 0 ? (completedTasks / tasks.length) * 100 : 0;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <CalendarDays className="w-7 h-7 text-violet-600" />
+              Study Planner
+            </h1>
+            <p className="text-slate-600 mt-1">Plan your study sessions for maximum efficiency</p>
+          </div>
+          <Button
+            onClick={() => generatePlanMutation.mutate()}
+            disabled={isGenerating}
+            className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-200"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Generating...
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI Generate Plan
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Week Selector */}
+        <Card className="border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2 overflow-x-auto">
+              {weekDays.map((day) => {
+                const isSelected = format(day, 'yyyy-MM-dd') === dateString;
+                const isToday = format(day, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd');
+                return (
+                  <button
+                    key={day.toString()}
+                    onClick={() => setSelectedDate(day)}
+                    className={`flex-1 min-w-[60px] p-3 rounded-xl text-center transition-all ${
+                      isSelected
+                        ? 'bg-violet-600 text-white shadow-lg'
+                        : isToday
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'bg-white text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <p className="text-xs font-medium">{format(day, 'EEE')}</p>
+                    <p className={`text-lg font-bold ${isSelected ? '' : ''}`}>{format(day, 'd')}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Progress */}
+        {tasks.length > 0 && (
+          <Card className="border-0 shadow-lg overflow-hidden">
+            <div className="p-4 bg-gradient-to-r from-violet-500 to-purple-600 text-white">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium">Today's Progress</span>
+                <span className="text-sm bg-white/20 px-2 py-1 rounded-full">
+                  {completedTasks}/{tasks.length} tasks
+                </span>
+              </div>
+              <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  className="h-full bg-white rounded-full"
+                />
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* AI Recommendation */}
+        {currentPlan?.ai_recommendation && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 rounded-2xl bg-gradient-to-r from-violet-50 to-purple-50 border border-violet-100"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-violet-800 mb-1">AI Recommendation</h3>
+                <p className="text-sm text-violet-700">{currentPlan.ai_recommendation}</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Tasks */}
+        <Card className="border-0 shadow-lg">
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">
+              {format(selectedDate, 'EEEE, MMMM d')}
+            </CardTitle>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddTask(true)}
+              className="gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              Add Task
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {/* Add Task Form */}
+            <AnimatePresence>
+              {showAddTask && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-4 p-4 bg-slate-50 rounded-xl"
+                >
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Subject</Label>
+                      <Input
+                        value={newTask.subject}
+                        onChange={(e) => setNewTask({ ...newTask, subject: e.target.value })}
+                        placeholder="e.g., Mathematics"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Topic</Label>
+                      <Input
+                        value={newTask.topic}
+                        onChange={(e) => setNewTask({ ...newTask, topic: e.target.value })}
+                        placeholder="e.g., Quadratic Equations"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Duration (minutes)</Label>
+                      <Input
+                        type="number"
+                        value={newTask.duration_minutes}
+                        onChange={(e) => setNewTask({ ...newTask, duration_minutes: parseInt(e.target.value) || 30 })}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label>Task Type</Label>
+                      <select
+                        value={newTask.task_type}
+                        onChange={(e) => setNewTask({ ...newTask, task_type: e.target.value })}
+                        className="mt-1 w-full p-2 rounded-md border border-slate-200"
+                      >
+                        <option value="Learn">Learn</option>
+                        <option value="Practice">Practice</option>
+                        <option value="Revise">Revise</option>
+                        <option value="Test">Test</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button variant="outline" onClick={() => setShowAddTask(false)}>Cancel</Button>
+                    <Button onClick={() => addTaskMutation.mutate()} className="bg-violet-600 hover:bg-violet-700">
+                      Add Task
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Task List */}
+            {tasks.length === 0 ? (
+              <div className="text-center py-12 text-slate-500">
+                <CalendarDays className="w-16 h-16 mx-auto mb-4 text-slate-300" />
+                <p className="font-medium">No tasks planned for this day</p>
+                <p className="text-sm mt-1">Click "AI Generate Plan" to create a personalized study plan</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tasks.map((task, index) => {
+                  const Icon = taskIcons[task.task_type] || BookOpen;
+                  return (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      className={`p-4 rounded-xl border transition-all ${
+                        task.completed
+                          ? 'bg-green-50 border-green-200'
+                          : 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <button
+                          onClick={() => updateTaskMutation.mutate({ taskIndex: index, completed: !task.completed })}
+                          className="mt-1 transition-transform hover:scale-110"
+                        >
+                          {task.completed ? (
+                            <CheckCircle2 className="w-6 h-6 text-green-500" />
+                          ) : (
+                            <Circle className="w-6 h-6 text-slate-300 hover:text-violet-400" />
+                          )}
+                        </button>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Icon className={`w-4 h-4 ${task.completed ? 'text-green-500' : 'text-violet-500'}`} />
+                            <span className={`font-medium ${task.completed ? 'text-green-700 line-through' : 'text-slate-800'}`}>
+                              {task.subject}
+                            </span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              task.priority === 'High' ? 'bg-red-100 text-red-700' :
+                              task.priority === 'Medium' ? 'bg-amber-100 text-amber-700' :
+                              'bg-green-100 text-green-700'
+                            }`}>
+                              {task.priority}
+                            </span>
+                          </div>
+                          <p className={`text-sm mt-1 ${task.completed ? 'text-green-600' : 'text-slate-600'}`}>
+                            {task.topic}
+                          </p>
+                          <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {task.duration_minutes} mins
+                            </span>
+                            {task.start_time && <span>@ {task.start_time}</span>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => deleteTaskMutation.mutate(index)}
+                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Motivation Quote */}
+        {currentPlan?.motivation_quote && (
+          <div className="p-4 text-center text-slate-600 italic border-t">
+            "{currentPlan.motivation_quote}"
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

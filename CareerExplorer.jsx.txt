@@ -1,0 +1,416 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Compass,
+  Briefcase,
+  GraduationCap,
+  TrendingUp,
+  Star,
+  Clock,
+  ChevronRight,
+  Search,
+  Sparkles,
+  Loader2,
+  BookOpen,
+  Target,
+  Users,
+  Award
+} from 'lucide-react';
+
+const categories = [
+  { id: 'Engineering', icon: '⚙️', color: 'from-blue-500 to-cyan-600' },
+  { id: 'Medical', icon: '🏥', color: 'from-red-500 to-rose-600' },
+  { id: 'Government', icon: '🏛️', color: 'from-amber-500 to-orange-600' },
+  { id: 'Business', icon: '💼', color: 'from-emerald-500 to-teal-600' },
+  { id: 'Technology', icon: '💻', color: 'from-violet-500 to-purple-600' },
+  { id: 'Teaching', icon: '📚', color: 'from-pink-500 to-rose-600' },
+  { id: 'Creative', icon: '🎨', color: 'from-indigo-500 to-blue-600' },
+  { id: 'Law', icon: '⚖️', color: 'from-slate-500 to-gray-600' },
+  { id: 'Defense', icon: '🎖️', color: 'from-green-600 to-emerald-700' },
+  { id: 'Research', icon: '🔬', color: 'from-cyan-500 to-blue-600' }
+];
+
+export default function CareerExplorer() {
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [selectedCareer, setSelectedCareer] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isExploring, setIsExploring] = useState(false);
+  const [careerDetails, setCareerDetails] = useState(null);
+
+  const { data: profiles } = useQuery({
+    queryKey: ['studentProfile'],
+    queryFn: () => base44.entities.StudentProfile.list(),
+  });
+  const profile = profiles?.[0];
+
+  const { data: savedCareers } = useQuery({
+    queryKey: ['careers'],
+    queryFn: () => base44.entities.CareerPath.list(),
+  });
+
+  const exploreCareerMutation = useMutation({
+    mutationFn: async (careerName) => {
+      setIsExploring(true);
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Provide comprehensive career guidance for: ${careerName}
+
+Context: This is for a first-generation student in India, Class ${profile?.class_grade || '10-12'}, preparing for ${profile?.exam_target || 'competitive exams'}.
+
+Provide detailed, practical information that would help a student from a modest background understand and pursue this career. Include:
+1. What the career involves day-to-day
+2. Required exams and qualifications (specifically for India)
+3. Key subjects to focus on
+4. Skills needed (both technical and soft skills)
+5. Expected salary range in India
+6. Time required for preparation
+7. Real success stories of people from humble backgrounds who achieved this
+8. Free or affordable resources to get started
+9. Common challenges and how to overcome them
+10. Alternative related careers
+
+Be encouraging but realistic. Use simple language.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            category: { type: "string" },
+            description: { type: "string" },
+            daily_life: { type: "string" },
+            required_exams: { type: "array", items: { type: "string" } },
+            key_subjects: { type: "array", items: { type: "string" } },
+            skills_needed: { type: "array", items: { type: "string" } },
+            salary_range: { type: "string" },
+            preparation_years: { type: "number" },
+            difficulty_level: { type: "string" },
+            success_stories: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string" },
+                  background: { type: "string" },
+                  story: { type: "string" }
+                }
+              }
+            },
+            resources: { type: "array", items: { type: "string" } },
+            challenges: { type: "array", items: { type: "string" } },
+            tips: { type: "array", items: { type: "string" } },
+            related_careers: { type: "array", items: { type: "string" } }
+          }
+        }
+      });
+
+      setCareerDetails(response);
+      setIsExploring(false);
+      return response;
+    },
+    onError: () => {
+      setIsExploring(false);
+    }
+  });
+
+  const popularCareers = {
+    Engineering: ['Software Engineer', 'Civil Engineer', 'Mechanical Engineer', 'Electrical Engineer'],
+    Medical: ['Doctor (MBBS)', 'Nurse', 'Pharmacist', 'Medical Lab Technician'],
+    Government: ['IAS Officer', 'SSC CGL', 'Bank PO', 'Railway Jobs'],
+    Business: ['MBA', 'CA', 'Entrepreneur', 'Marketing Manager'],
+    Technology: ['Data Scientist', 'Web Developer', 'Cyber Security Expert', 'AI/ML Engineer'],
+    Teaching: ['School Teacher', 'College Professor', 'Online Tutor', 'Education Counselor'],
+    Creative: ['Graphic Designer', 'Content Writer', 'Video Editor', 'UI/UX Designer'],
+    Law: ['Advocate', 'Legal Advisor', 'Judge', 'Corporate Lawyer'],
+    Defense: ['Army Officer', 'Navy', 'Air Force', 'CRPF/BSF'],
+    Research: ['Scientist (ISRO/DRDO)', 'Research Scholar', 'Lab Researcher', 'Data Analyst']
+  };
+
+  // Career Details View
+  if (careerDetails) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+        <div className="max-w-4xl mx-auto space-y-6">
+          <Button
+            variant="outline"
+            onClick={() => setCareerDetails(null)}
+            className="mb-4"
+          >
+            ← Back to Careers
+          </Button>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            {/* Header */}
+            <Card className="border-0 shadow-xl overflow-hidden">
+              <div className="p-8 bg-gradient-to-br from-violet-600 to-purple-700 text-white">
+                <h1 className="text-3xl font-bold mb-2">{careerDetails.title}</h1>
+                <p className="text-violet-100 mb-4">{careerDetails.description}</p>
+                <div className="flex flex-wrap gap-3">
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
+                    {careerDetails.difficulty_level}
+                  </span>
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    {careerDetails.preparation_years} years prep
+                  </span>
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm">
+                    💰 {careerDetails.salary_range}
+                  </span>
+                </div>
+              </div>
+            </Card>
+
+            {/* Daily Life */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Briefcase className="w-5 h-5 text-violet-600" />
+                  What You'll Do
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-700">{careerDetails.daily_life}</p>
+              </CardContent>
+            </Card>
+
+            {/* Requirements */}
+            <div className="grid md:grid-cols-2 gap-6 mt-6">
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <GraduationCap className="w-5 h-5 text-blue-600" />
+                    Required Exams
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {careerDetails.required_exams?.map((exam, i) => (
+                      <div key={i} className="p-3 bg-blue-50 rounded-xl text-blue-800 text-sm">
+                        {exam}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <BookOpen className="w-5 h-5 text-green-600" />
+                    Key Subjects
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {careerDetails.key_subjects?.map((subject, i) => (
+                      <span key={i} className="px-3 py-1 bg-green-50 text-green-700 rounded-full text-sm">
+                        {subject}
+                      </span>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Skills */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="w-5 h-5 text-amber-600" />
+                  Skills You'll Need
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {careerDetails.skills_needed?.map((skill, i) => (
+                    <span key={i} className="px-3 py-2 bg-amber-50 text-amber-700 rounded-xl text-sm">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Success Stories */}
+            {careerDetails.success_stories?.length > 0 && (
+              <Card className="border-0 shadow-lg mt-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Star className="w-5 h-5 text-yellow-500" />
+                    Inspiring Success Stories
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {careerDetails.success_stories.map((story, i) => (
+                    <div key={i} className="p-4 bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl">
+                      <h4 className="font-semibold text-violet-800">{story.name}</h4>
+                      <p className="text-sm text-violet-600 mt-1">{story.background}</p>
+                      <p className="text-slate-700 mt-2 text-sm">{story.story}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Tips */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-violet-600" />
+                  Tips for Success
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {careerDetails.tips?.map((tip, i) => (
+                    <li key={i} className="flex items-start gap-2 text-slate-700">
+                      <span className="text-violet-600 mt-1">✓</span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* Resources */}
+            <Card className="border-0 shadow-lg mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5 text-emerald-600" />
+                  Free Resources
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {careerDetails.resources?.map((resource, i) => (
+                    <li key={i} className="p-3 bg-emerald-50 rounded-xl text-emerald-800 text-sm">
+                      {resource}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50 p-4 md:p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <Compass className="w-7 h-7 text-violet-600" />
+            Career Explorer
+          </h1>
+          <p className="text-slate-600 mt-1">Discover career paths and plan your future</p>
+        </div>
+
+        {/* Search */}
+        <Card className="border-0 shadow-lg">
+          <CardContent className="p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search any career (e.g., Doctor, Engineer, IAS...)"
+                className="pl-10 py-6 text-lg"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && searchQuery) {
+                    exploreCareerMutation.mutate(searchQuery);
+                  }
+                }}
+              />
+              <Button
+                onClick={() => exploreCareerMutation.mutate(searchQuery)}
+                disabled={!searchQuery || isExploring}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-violet-600 hover:bg-violet-700"
+              >
+                {isExploring ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Explore'
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Categories */}
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">Browse by Category</h2>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {categories.map((cat) => (
+              <motion.button
+                key={cat.id}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setSelectedCategory(selectedCategory === cat.id ? null : cat.id)}
+                className={`p-4 rounded-2xl border-2 transition-all ${
+                  selectedCategory === cat.id
+                    ? 'border-violet-400 bg-violet-50'
+                    : 'border-slate-200 bg-white hover:border-violet-300'
+                }`}
+              >
+                <div className="text-2xl mb-2">{cat.icon}</div>
+                <p className="text-sm font-medium text-slate-700">{cat.id}</p>
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
+        {/* Career List */}
+        <AnimatePresence>
+          {selectedCategory && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+            >
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle>{selectedCategory} Careers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-3">
+                    {popularCareers[selectedCategory]?.map((career) => (
+                      <motion.button
+                        key={career}
+                        whileHover={{ scale: 1.01 }}
+                        onClick={() => exploreCareerMutation.mutate(career)}
+                        disabled={isExploring}
+                        className="p-4 bg-slate-50 rounded-xl text-left hover:bg-violet-50 transition-all flex items-center justify-between group"
+                      >
+                        <span className="font-medium text-slate-700">{career}</span>
+                        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-violet-600 transition-colors" />
+                      </motion.button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Loading State */}
+        {isExploring && (
+          <Card className="border-0 shadow-lg">
+            <CardContent className="p-8 text-center">
+              <Loader2 className="w-12 h-12 animate-spin text-violet-600 mx-auto mb-4" />
+              <p className="text-slate-600">Exploring career details...</p>
+              <p className="text-sm text-slate-500 mt-1">Getting exam info, success stories, and tips</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    </div>
+  );
+}
